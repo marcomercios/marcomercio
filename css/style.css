@@ -44,6 +44,7 @@ body {
 }
 
 .nav-container {
+  position: relative;
   max-width: 1200px;
   margin: 0 auto;
   padding: 1.2rem 2rem;
@@ -67,6 +68,7 @@ body {
 .nav-links {
   display: flex;
   align-items: center;
+  padding-right: 3.75rem;
 }
 
 .nav-links a {
@@ -478,16 +480,48 @@ body {
 }
 
 .cart-trigger-btn {
+  position: absolute;
+  top: 50%;
+  right: 2rem;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
   background: transparent;
   border: 1px solid var(--accent-gold);
   color: var(--accent-gold);
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+  padding: 0;
+  border-radius: 50%;
   cursor: pointer;
   font-family: var(--font-family);
   font-weight: 600;
-  margin-left: 2rem;
   transition: all 0.3s ease;
+}
+.cart-trigger-btn svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#cart-counter {
+  position: absolute;
+  top: -0.3rem;
+  right: -0.35rem;
+  display: grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.2rem;
+  border: 2px solid rgba(13, 14, 18, 0.92);
+  border-radius: 999px;
+  background-color: var(--accent-gold);
+  color: #000;
+  font-size: 0.7rem;
+  line-height: 1;
 }
 .cart-trigger-btn:hover {
   background: var(--accent-gold);
@@ -735,9 +769,23 @@ body {
     gap: 1rem;
   }
 
+  .logo {
+    align-self: flex-start;
+    max-width: calc(100% - 3.5rem);
+    font-size: clamp(1.05rem, 5vw, 1.4rem);
+    letter-spacing: 1px;
+  }
+
   .nav-links {
     flex-wrap: wrap;
     justify-content: center;
+    padding-right: 0;
+  }
+
+  .cart-trigger-btn {
+    top: 1rem;
+    right: 1rem;
+    transform: none;
   }
 
   .nav-links a {

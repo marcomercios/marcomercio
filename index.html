@@ -21,9 +21,13 @@
         <a href="#categorias">Categorías</a>
         <a href="#nosotros">Nosotros</a>
         <a href="#contacto">Contacto</a>
-        <!-- Botón del Carrito -->
-        <button id="cart-toggle-btn" class="cart-trigger-btn">
-          🛒 Carrito (<span id="cart-counter">0</span>)
+        <button id="cart-toggle-btn" class="cart-trigger-btn" type="button" aria-label="Abrir carrito" title="Abrir carrito">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M3 3h2l2.2 11.2a2 2 0 0 0 2 1.6h8.9a2 2 0 0 0 1.9-1.4L22 8H6"></path>
+            <circle cx="10" cy="20" r="1"></circle>
+            <circle cx="18" cy="20" r="1"></circle>
+          </svg>
+          <span id="cart-counter" aria-live="polite" aria-atomic="true">0</span>
         </button>
       </nav>
     </div>
