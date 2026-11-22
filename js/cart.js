@@ -39,18 +39,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderProducts('all');
     updateCartUI();
   } catch (error) {
-    showCatalogError(`No se pudo cargar el catálogo: ${error.message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    showCatalogError(`No se pudo cargar el catálogo: ${message}`);
   }
 });
 
 async function loadProducts() {
-  const { data, error } = await supabase
+  let query = supabase
     .from('products')
-    .select('id, sku, name, category, price, image, status')
+    .select('id, sku, name, description, category, price, image, images, status')
     .order('created_at', { ascending: true });
 
+  let { data, error } = await query;
+
+  if (error && (error.code === '42703' || /description|images/i.test(error.message))) {
+    ({ data, error } = await supabase
+      .from('products')
+      .select('id, sku, name, category, price, image, status')
+      .order('created_at', { ascending: true }));
+  }
+
   if (error) throw error;
-  products = data;
+  if (!data) throw new Error('Supabase devolvió una respuesta vacía.');
+  products = data.map(product => ({
+    ...product,
+    description: product.description || '',
+    images: Array.isArray(product.images) ? product.images : []
+  }));
 }
 
 function showCatalogError(message) {
@@ -80,6 +95,7 @@ function renderProducts(categoryFilter = 'all') {
 
   filtered.forEach(product => {
     const isAvailable = product.status === 'Disponible';
+    const imageUrls = getProductImageUrls(product);
     const card = document.createElement('div');
     card.className = 'card';
 
@@ -90,13 +106,16 @@ function renderProducts(categoryFilter = 'all') {
     const status = document.createElement('span');
     const sku = document.createElement('small');
     const name = document.createElement('h3');
+    const description = document.createElement('p');
     const price = document.createElement('p');
     const addButton = document.createElement('button');
 
     imageContainer.className = 'card-img-placeholder';
-    image.src = product.image;
+    image.className = 'product-main-image';
+    image.src = imageUrls[0] || product.image;
     image.alt = product.name;
-    image.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
+    image.loading = 'lazy';
+    image.decoding = 'async';
     content.className = 'card-content';
     details.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;';
     status.className = `stock-badge ${isAvailable ? 'disponible' : 'agotado'}`;
@@ -104,6 +123,8 @@ function renderProducts(categoryFilter = 'all') {
     sku.style.cssText = 'color: var(--text-muted); font-size: 0.75rem;';
     sku.textContent = `SKU: ${product.sku}`;
     name.textContent = product.name;
+    description.className = 'product-description';
+    description.textContent = product.description || '';
     price.style.cssText = 'color: var(--accent-gold); font-size: 1.2rem; font-weight: 800; margin-bottom: 1rem;';
     price.textContent = `$${Number(product.price).toFixed(2)} MXN`;
     addButton.type = 'button';
@@ -115,11 +136,49 @@ function renderProducts(categoryFilter = 'all') {
     addButton.textContent = isAvailable ? 'Añadir al Carrito' : 'Agotado';
 
     details.append(status, sku);
-    content.append(details, name, price, addButton);
+    content.append(details, name);
+    if (product.description) content.appendChild(description);
+    content.append(price, addButton);
     imageContainer.appendChild(image);
-    card.append(imageContainer, content);
+
+    if (imageUrls.length > 1) {
+      const thumbnails = document.createElement('div');
+      thumbnails.className = 'product-image-thumbnails';
+
+      imageUrls.forEach((url, index) => {
+        const thumbnail = document.createElement('button');
+        const thumbnailImage = document.createElement('img');
+        thumbnail.type = 'button';
+        thumbnail.className = 'product-image-thumb';
+        thumbnail.dataset.sku = product.sku;
+        thumbnail.dataset.imageIndex = String(index);
+        thumbnail.setAttribute('aria-label', `Ver foto ${index + 1} de ${product.name}`);
+        thumbnail.setAttribute('aria-pressed', String(index === 0));
+        thumbnailImage.src = url;
+        thumbnailImage.alt = '';
+        thumbnailImage.loading = 'lazy';
+        thumbnail.appendChild(thumbnailImage);
+        thumbnails.appendChild(thumbnail);
+      });
+
+      card.append(imageContainer, thumbnails, content);
+    } else {
+      card.append(imageContainer, content);
+    }
     productsGrid.appendChild(card);
   });
+}
+
+function getProductImageUrls(product) {
+  const additionalImages = Array.isArray(product.images)
+    ? product.images.map(path => (
+      path.startsWith('http')
+        ? path
+        : supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl
+    ))
+    : [];
+
+  return [...new Set([product.image, ...additionalImages].filter(Boolean))];
 }
 
 function setupEventListeners() {
@@ -154,8 +213,27 @@ function setupEventListeners() {
 
   // Agregar al carrito
   if (productsGrid) {
-    productsGrid.addEventListener('click', (e) => {
-      const button = e.target.closest('.add-to-cart-btn');
+    productsGrid.addEventListener('click', (event) => {
+      if (!(event.target instanceof Element)) return;
+
+      const thumbnail = event.target.closest('.product-image-thumb');
+      if (thumbnail) {
+        const product = products.find(item => item.sku === thumbnail.dataset.sku);
+        const card = thumbnail.closest('.card');
+        const mainImage = card?.querySelector('.product-main-image');
+        const imageIndex = Number(thumbnail.dataset.imageIndex);
+        const imageUrl = product && getProductImageUrls(product)[imageIndex];
+
+        if (mainImage instanceof HTMLImageElement && imageUrl) {
+          mainImage.src = imageUrl;
+          card.querySelectorAll('.product-image-thumb').forEach(button => {
+            button.setAttribute('aria-pressed', String(button === thumbnail));
+          });
+        }
+        return;
+      }
+
+      const button = event.target.closest('.add-to-cart-btn');
       if (button) {
         const sku = button.dataset.sku;
         addToCart(sku);

@@ -47,7 +47,7 @@ values
   ('ORO-001', 'Cadena Tejido Chino 14k Oro Laminado', 'Oro Laminado', 890.00, 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?auto=format&fit=crop&w=600&q=80', 'Disponible'),
   ('ORO-002', 'Esclava Grumet 10mm Oro Laminado', 'Oro Laminado', 1120.00, 'https://images.unsplash.com/photo-1611652022419-a9419f74343d?auto=format&fit=crop&w=600&q=80', 'Disponible'),
   ('GOR-001', 'Gorra Snapback Classic', 'Gorras', 450.00, 'img/1g.webp', 'Disponible'),
-  ('GOR-002', 'Gorra Deportiva Minimal Black', 'Gorras', 390.00, 'https://images.unsplash.com/photo-1534030347209-467a5b0ad3e6?auto=format&fit=crop&w=600&q=80', 'Disponible'),
+  ('GOR-002', 'Gorra Deportiva Minimal Black', 'Gorras', 390.00, 'https://iswtfxqsnybmtsmpwqhi.supabase.co/storage/v1/object/sign/Productos/NEW%20ARRIVALS.jpg?token=eyJraWQiOiI3NDQ0YTBkYS04NWFhLTQyODItOTZhOS01Y2I1NjFkNzg5MGYiLCJhbGciOiJFUzI1NiJ9.eyJ1cmwiOiJQcm9kdWN0b3MvTkVXIEFSUklWQUxTLmpwZyIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3OTUzMjA2ODMsImV4cCI6MTgyNjg1NjY4M30.dy9DmW4qFjDkBQBcUAQvB22p3LOZY8Dq74__zcDFc-U2ftolQhJyVnZhqVgU3VlkwEF4qgyP_9OfFtl4BKp5Jg', 'Disponible'),
   ('SPO-001', 'Playera Dry-Fit Stealth Black', 'Ropa/Sport', 380.00, 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=600&q=80', 'Disponible'),
   ('SPO-002', 'Short Deportivo Running Pro', 'Ropa/Sport', 420.00, 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=600&q=80', 'Disponible')
 on conflict (sku) do nothing;

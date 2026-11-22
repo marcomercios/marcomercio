@@ -11,9 +11,11 @@ const productForm = document.getElementById('product-form');
 const productIdInput = document.getElementById('product-id');
 const pSkuInput = document.getElementById('p-sku');
 const pNameInput = document.getElementById('p-name');
+const pDescriptionInput = document.getElementById('p-description');
 const pCategoryInput = document.getElementById('p-category');
 const pPriceInput = document.getElementById('p-price');
 const pImageInput = document.getElementById('p-image');
+const pImagesInput = document.getElementById('p-images');
 const pStatusInput = document.getElementById('p-status');
 const formSubmitBtn = document.getElementById('form-submit-btn');
 const cancelEditBtn = document.getElementById('cancel-edit-btn');
@@ -92,10 +94,17 @@ function setupAdminListeners() {
 }
 
 async function loadAdminProducts() {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('products')
-    .select('id, sku, name, category, price, image, status')
+    .select('id, sku, name, description, category, price, image, images, status')
     .order('created_at', { ascending: true });
+
+  if (error && (error.code === '42703' || /description|images/i.test(error.message))) {
+    ({ data, error } = await supabase
+      .from('products')
+      .select('id, sku, name, category, price, image, status')
+      .order('created_at', { ascending: true }));
+  }
 
   if (error) {
     showAdminError(`No se pudo cargar el catálogo: ${error.message}`);
@@ -161,27 +170,99 @@ async function handleFormSubmit(event) {
   showAdminError('');
 
   const id = productIdInput.value;
-  const product = {
-    sku: pSkuInput.value.trim(),
-    name: pNameInput.value.trim(),
-    category: pCategoryInput.value,
-    price: Number(pPriceInput.value),
-    image: pImageInput.value.trim(),
-    status: pStatusInput.value
-  };
+  const existingProduct = productsList.find((item) => item.id === id);
+  const sku = pSkuInput.value.trim();
+  const files = Array.from(pImagesInput.files || []);
+  const uploadedPaths = [];
+  formSubmitBtn.disabled = true;
 
-  const query = id
-    ? supabase.from('products').update(product).eq('id', id)
-    : supabase.from('products').insert(product);
-  const { error } = await query;
+  try {
+    const uploadedUrls = await uploadProductImages(files, sku, uploadedPaths);
+    const image = pImageInput.value.trim() || uploadedUrls[0] || existingProduct?.image;
 
-  if (error) {
-    showAdminError(`No se pudo guardar el producto: ${error.message}`);
-    return;
+    if (!image) {
+      throw new Error('Agrega una URL de imagen principal o sube al menos una foto.');
+    }
+
+    const product = {
+      sku,
+      name: pNameInput.value.trim(),
+      description: pDescriptionInput.value.trim(),
+      category: pCategoryInput.value,
+      price: Number(pPriceInput.value),
+      image,
+      images: [...new Set([...(existingProduct?.images || []), ...uploadedPaths])],
+      status: pStatusInput.value
+    };
+
+    let query = id
+      ? supabase.from('products').update(product).eq('id', id)
+      : supabase.from('products').insert(product);
+    let { error } = await query;
+
+    if (error && (error.code === '42703' || /description|images/i.test(error.message))) {
+      const { description, images, ...baselineProduct } = product;
+      if (uploadedUrls.length > 0) baselineProduct.image = uploadedUrls[0];
+      query = id
+        ? supabase.from('products').update(baselineProduct).eq('id', id)
+        : supabase.from('products').insert(baselineProduct);
+      ({ error } = await query);
+    }
+
+    if (error) {
+      const cleanupMessage = await removeUploadedImages(uploadedPaths);
+      showAdminError(`No se pudo guardar el producto: ${error.message}${cleanupMessage}`);
+      return;
+    }
+
+    resetForm();
+    await loadAdminProducts();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const cleanupMessage = await removeUploadedImages(uploadedPaths);
+    showAdminError(`No se pudo guardar el producto: ${message}${cleanupMessage}`);
+  } finally {
+    formSubmitBtn.disabled = false;
+  }
+}
+
+async function uploadProductImages(files, sku, uploadedPaths) {
+  const uploadedUrls = [];
+  const safeSku = sku.replace(/[^a-zA-Z0-9_-]/g, '-');
+
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) {
+      throw new Error(`El archivo "${file.name}" no es una imagen válida.`);
+    }
+
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+    const path = `${safeSku}/${crypto.randomUUID()}-${safeName}`;
+    const { error } = await supabase.storage
+      .from('product-images')
+      .upload(path, file, { contentType: file.type, upsert: false });
+
+    if (error) throw error;
+
+    uploadedPaths.push(path);
+    const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+    uploadedUrls.push(data.publicUrl);
   }
 
-  resetForm();
-  await loadAdminProducts();
+  return uploadedUrls;
+}
+
+async function removeUploadedImages(paths) {
+  if (paths.length === 0) return '';
+
+  try {
+    const { error } = await supabase.storage.from('product-images').remove(paths);
+    return error
+      ? ` No se pudieron limpiar las fotos subidas: ${error.message}`
+      : '';
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return ` No se pudieron limpiar las fotos subidas: ${message}`;
+  }
 }
 
 function editProduct(id) {
@@ -192,6 +273,7 @@ function editProduct(id) {
   pSkuInput.value = product.sku;
   pSkuInput.disabled = true;
   pNameInput.value = product.name;
+  pDescriptionInput.value = product.description || '';
   pCategoryInput.value = product.category;
   pPriceInput.value = product.price;
   pImageInput.value = product.image;
@@ -213,7 +295,9 @@ async function deleteProduct(id) {
     return;
   }
 
+  const cleanupMessage = await removeUploadedImages(product.images || []);
   await loadAdminProducts();
+  if (cleanupMessage) showAdminError(`El producto se eliminó.${cleanupMessage}`);
 }
 
 function resetForm() {
